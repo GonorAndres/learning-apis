@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+subagents_outputs
+.playwright-mcp
+.env.local
+*.png
+*.output
