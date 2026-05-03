@@ -1,0 +1,22 @@
+[
+  {
+    "page": 1,
+    "pages": 1,
+    "per_page": 50,
+    "total": 24
+  },
+  [
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2023", "value": 6.581},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2022", "value": 6.386},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2021", "value": 8.307},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2020", "value": 7.595},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2019", "value": 5.708},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2018", "value": 5.649},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2017", "value": 5.580},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2016", "value": 5.530},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2015", "value": 5.498},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2010", "value": 5.269},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2005", "value": 4.964},
+    {"indicator": {"id": "SP.DYN.CDRT.IN", "value": "Crude death rate (per 1,000 people)"}, "country": {"id": "MX", "value": "Mexico"}, "date": "2000", "value": 4.780}
+  ]
+]
