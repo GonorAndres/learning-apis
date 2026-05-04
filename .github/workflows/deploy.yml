@@ -10,7 +10,8 @@ env:
   PROJECT_ID: project-ad7a5be2-a1c7-4510-82d
   REGION: us-central1
   SERVICE_NAME: learning-apis
-  IMAGE: gcr.io/project-ad7a5be2-a1c7-4510-82d/learning-apis
+  AR_REPO: cloud-run-source-deploy
+  IMAGE: us-central1-docker.pkg.dev/project-ad7a5be2-a1c7-4510-82d/cloud-run-source-deploy/learning-apis
 
 permissions:
   contents: read
@@ -40,16 +41,26 @@ jobs:
         with:
           workload_identity_provider: projects/451451662791/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-deployer@project-ad7a5be2-a1c7-4510-82d.iam.gserviceaccount.com
+          token_format: access_token
+
+      - uses: docker/login-action@v3
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }},${{ env.IMAGE }}:latest
 
       - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Build container
-        run: gcloud builds submit --tag ${{ env.IMAGE }} --timeout=1200
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.IMAGE }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --set-env-vars "FRED_API_KEY=${{ secrets.FRED_API_KEY }},BANXICO_TOKEN=${{ secrets.BANXICO_TOKEN }}" \
