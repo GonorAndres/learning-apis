@@ -1,0 +1,66 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PROJECT_ID: project-ad7a5be2-a1c7-4510-82d
+  REGION: us-central1
+  SERVICE_NAME: learning-apis
+  IMAGE: gcr.io/project-ad7a5be2-a1c7-4510-82d/learning-apis
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/451451662791/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@project-ad7a5be2-a1c7-4510-82d.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build container
+        run: gcloud builds submit --tag ${{ env.IMAGE }} --timeout=1200
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE }} \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-env-vars "FRED_API_KEY=${{ secrets.FRED_API_KEY }},BANXICO_TOKEN=${{ secrets.BANXICO_TOKEN }}" \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 3
+
+      - name: Show URL
+        run: |
+          gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format="value(status.url)"
