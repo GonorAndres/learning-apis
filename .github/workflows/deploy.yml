@@ -1,4 +1,4 @@
-name: Deploy to Cloud Run
+name: Verify and deploy
 
 on:
   push:
@@ -15,10 +15,9 @@ env:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,11 +27,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run build:worker
 
-  deploy:
-    needs: test
+  deploy-backend:
+    needs: verify
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      service-url: ${{ steps.backend-url.outputs.service-url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,20 +65,49 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
-        run: |
+        run: >-
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
-            --set-env-vars "FRED_API_KEY=${{ secrets.FRED_API_KEY }},BANXICO_TOKEN=${{ secrets.BANXICO_TOKEN }}" \
+            --clear-env-vars \
+            --set-secrets "FRED_API_KEY=fred-api-key:latest,BANXICO_TOKEN=banxico-token:latest" \
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
             --min-instances 0 \
             --max-instances 3
 
-      - name: Show URL
+      - id: backend-url
+        name: Capture backend URL
+        run: >-
+          echo "service-url=$(gcloud run services describe '${{ env.SERVICE_NAME }}'
+          --region '${{ env.REGION }}' --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+  deploy-frontend:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:worker
+      - name: Deploy Cloudflare Worker
+        run: >-
+          npx wrangler deploy
+          --var "CLOUD_RUN_API_ORIGIN:${{ needs.deploy-backend.outputs.service-url }}"
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  smoke-test:
+    needs: deploy-frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check frontend and backend route
         run: |
-          gcloud run services describe ${{ env.SERVICE_NAME }} \
-            --region ${{ env.REGION }} \
-            --format="value(status.url)"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors https://learning-apis.gonor.me/en > /dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors https://learning-apis.gonor.me/api/mortality > /dev/null

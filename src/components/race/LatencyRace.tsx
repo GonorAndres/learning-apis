@@ -15,7 +15,7 @@ import {
 
 export function LatencyRace() {
   const t = useTranslations("race");
-  const { racers, raceStatus, history, startRace, reset } = useRace();
+  const { racers, raceStatus, history, startRace } = useRace();
 
   const sortedResults =
     raceStatus === "done"
@@ -56,7 +56,7 @@ export function LatencyRace() {
 
         {/* Race tracks */}
         <div className="mt-12 space-y-4">
-          {racers.map((racer, i) => (
+          {racers.map((racer) => (
             <div key={racer.apiId} className="flex items-center gap-4">
               <div className="w-24 sm:w-32 text-sm font-medium text-foreground truncate">
                 {racer.name}
@@ -117,7 +117,7 @@ export function LatencyRace() {
           )}
           {raceStatus === "done" && (
             <button
-              onClick={() => { reset(); setTimeout(startRace, 100); }}
+              onClick={startRace}
               className="px-6 py-3 text-sm font-medium rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity"
             >
               {t("runAgain")}

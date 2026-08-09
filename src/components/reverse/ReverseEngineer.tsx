@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
+import { jsonEqual, normalizeApiGuess } from "@/lib/reverse-engineering";
 
 type Challenge = {
   apiId: string;
@@ -18,7 +19,7 @@ const CHALLENGES: Omit<Challenge, "response">[] = [
   { apiId: "custom", apiName: "Your API", url: "/api/mortality?format=table", difficulty: 2 },
   { apiId: "worldbank", apiName: "World Bank", url: "/api/proxy/worldbank?country=MEX&indicator=SP.DYN.LE00.IN&date=2010:2020", difficulty: 2 },
   { apiId: "worldbank", apiName: "World Bank", url: "/api/proxy/worldbank?country=USA&indicator=NY.GDP.PCAP.CD&date=2015:2023", difficulty: 3 },
-  { apiId: "fred", apiName: "FRED", url: "/api/proxy/fred?path=/series/observations&series_id=CPIAUCSL&observation_start=2020-01-01&frequency=a", difficulty: 3 },
+  { apiId: "fred", apiName: "FRED", url: "/api/proxy/fred?path=/series/observations&series_id=DGS10&observation_start=2020-01-01&frequency=m", difficulty: 3 },
 ];
 
 export function ReverseEngineer() {
@@ -29,38 +30,77 @@ export function ReverseEngineer() {
   const [guessResult, setGuessResult] = useState<{ match: boolean; response: unknown } | null>(null);
   const [checking, setChecking] = useState(false);
   const [score, setScore] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const solvedChallenge = useRef(false);
+  const challengeRequest = useRef<AbortController | null>(null);
+  const guessRequest = useRef<AbortController | null>(null);
 
   const loadChallenge = useCallback(async () => {
+    challengeRequest.current?.abort();
+    guessRequest.current?.abort();
+    const controller = new AbortController();
+    challengeRequest.current = controller;
     setLoading(true);
+    setChecking(false);
+    setLoadError(false);
+    solvedChallenge.current = false;
     setGuessUrl("");
     setGuessResult(null);
     const pick = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
     try {
-      const res = await fetch(pick.url);
+      const res = await fetch(pick.url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setChallenge({ ...pick, response: data });
+      if (!controller.signal.aborted) setChallenge({ ...pick, response: data });
     } catch {
-      setChallenge(null);
+      if (!controller.signal.aborted) {
+        setChallenge(null);
+        setLoadError(true);
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => { loadChallenge(); }, [loadChallenge]);
+  useEffect(() => {
+    const initialLoad = setTimeout(loadChallenge, 0);
+    return () => {
+      clearTimeout(initialLoad);
+      challengeRequest.current?.abort();
+      guessRequest.current?.abort();
+    };
+  }, [loadChallenge]);
 
   async function checkGuess() {
     if (!guessUrl.trim() || !challenge) return;
+    const url = normalizeApiGuess(guessUrl, window.location.origin);
+    if (!url) {
+      setGuessResult({ match: false, response: { error: t("invalidUrl") } });
+      return;
+    }
+
+    guessRequest.current?.abort();
+    const controller = new AbortController();
+    guessRequest.current = controller;
     setChecking(true);
     try {
-      const url = guessUrl.startsWith("/") ? guessUrl : `/${guessUrl}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const match = JSON.stringify(data) === JSON.stringify(challenge.response);
+      if (controller.signal.aborted) return;
+      const match = jsonEqual(data, challenge.response);
       setGuessResult({ match, response: data });
-      if (match) setScore((s) => s + challenge.difficulty);
+      if (match && !solvedChallenge.current) {
+        solvedChallenge.current = true;
+        setScore((currentScore) => currentScore + challenge.difficulty);
+      }
     } catch {
-      setGuessResult({ match: false, response: { error: "Failed to fetch. Check your URL." } });
+      if (!controller.signal.aborted) {
+        setGuessResult({ match: false, response: { error: t("fetchError") } });
+      }
+    } finally {
+      if (!controller.signal.aborted) setChecking(false);
     }
-    setChecking(false);
   }
 
   return (
@@ -106,7 +146,7 @@ export function ReverseEngineer() {
                   {t("difficulty")}: {"*".repeat(challenge.difficulty)}
                 </span>
               </div>
-              <span className="text-xs font-mono text-muted">Score: {score}</span>
+              <span className="text-xs font-mono text-muted">{t("score")}: {score}</span>
             </div>
 
             <div className="rounded-xl border border-accent-amber/20 bg-accent-amber/5 p-5 mb-6">
@@ -179,6 +219,18 @@ export function ReverseEngineer() {
                 <motion.div key={i} className="w-2 h-2 rounded-full bg-muted" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />
               ))}
             </div>
+          </div>
+        )}
+
+        {loadError && !loading && (
+          <div className="mt-12 text-center">
+            <p className="text-sm text-red-400">{t("loadError")}</p>
+            <button
+              onClick={loadChallenge}
+              className="mt-4 px-5 py-2 text-sm font-medium rounded-lg border border-border text-muted hover:text-foreground"
+            >
+              {t("retry")}
+            </button>
           </div>
         )}
       </div>

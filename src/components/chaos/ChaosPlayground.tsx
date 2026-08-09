@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { CHAOS_CATALOG, type ChaosChallenge } from "@/lib/chaos-catalog";
+import { CHAOS_CATALOG, allowsCrossOrigin, type ChaosChallenge } from "@/lib/chaos-catalog";
 
 const STORAGE_KEY = "chaos-unlocked";
 
@@ -30,7 +30,21 @@ export function ChaosPlayground() {
   const [justUnlocked, setJustUnlocked] = useState<string | null>(null);
 
   useEffect(() => {
-    setUnlocked(loadUnlocked());
+    const frame = requestAnimationFrame(() => setUnlocked(loadUnlocked()));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const unlock = useCallback((code: string) => {
+    setUnlocked((prev) => {
+      const next = new Set(prev);
+      if (!next.has(code)) {
+        next.add(code);
+        saveUnlocked(next);
+        setJustUnlocked(code);
+        setTimeout(() => setJustUnlocked(null), 2000);
+      }
+      return next;
+    });
   }, []);
 
   const attemptChallenge = useCallback(async (challenge: ChaosChallenge) => {
@@ -63,12 +77,12 @@ export function ChaosPlayground() {
           unlock(challenge.code);
         }
       } else if (challenge.method === "CORS") {
-        try {
-          const res = await fetch(challenge.url);
-          setResult({ status: res.status, body: await res.text() });
-        } catch {
-          setResult({ status: "CORS", body: "TypeError: Failed to fetch. The browser blocked this request because the server did not include CORS headers." });
+        const res = await fetch(challenge.url);
+        if (!allowsCrossOrigin(res.headers, window.location.origin)) {
+          setResult({ status: "CORS MODEL", body: t("corsSimulation") });
           unlock(challenge.code);
+        } else {
+          setResult({ status: res.status, body: await res.text() });
         }
       } else if (challenge.method === "POST") {
         const res = await fetch(challenge.url, { method: "POST" });
@@ -86,20 +100,7 @@ export function ChaosPlayground() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  function unlock(code: string) {
-    setUnlocked((prev) => {
-      const next = new Set(prev);
-      if (!next.has(code)) {
-        next.add(code);
-        saveUnlocked(next);
-        setJustUnlocked(code);
-        setTimeout(() => setJustUnlocked(null), 2000);
-      }
-      return next;
-    });
-  }
+  }, [t, unlock]);
 
   const isError = result && (typeof result.status === "string" || (typeof result.status === "number" && result.status >= 400));
 

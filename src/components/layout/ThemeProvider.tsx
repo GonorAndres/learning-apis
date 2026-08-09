@@ -2,10 +2,9 @@
 
 import {
   createContext,
-  useContext,
-  useEffect,
-  useState,
   useCallback,
+  useContext,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -19,44 +18,43 @@ const ThemeContext = createContext<{
   toggle: () => {},
 });
 
+function getTheme(): Theme {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+function getServerTheme(): Theme {
+  return "dark";
+}
+
+function subscribeToThemeChange(onChange: () => void) {
+  function handleStorage(event: StorageEvent) {
+    if (event.key !== "theme") return;
+    const theme = event.newValue === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+    onChange();
+  }
+
+  window.addEventListener("themechange", onChange);
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    window.removeEventListener("themechange", onChange);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
 export function useTheme() {
   return useContext(ThemeContext);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored) {
-      setTheme(stored);
-    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      setTheme("light");
-    }
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted) {
-      document.documentElement.setAttribute("data-theme", theme);
-      localStorage.setItem("theme", theme);
-    }
-  }, [theme, mounted]);
+  const theme = useSyncExternalStore(subscribeToThemeChange, getTheme, getServerTheme);
 
   const toggle = useCallback(() => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    const nextTheme = getTheme() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem("theme", nextTheme);
+    window.dispatchEvent(new Event("themechange"));
   }, []);
-
-  if (!mounted) {
-    return (
-      <div style={{ visibility: "hidden" }}>
-        <ThemeContext.Provider value={{ theme, toggle }}>
-          {children}
-        </ThemeContext.Provider>
-      </div>
-    );
-  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggle }}>

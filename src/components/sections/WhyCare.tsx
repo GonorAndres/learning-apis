@@ -11,7 +11,7 @@ export function WhyCare() {
   const t = useTranslations("whyCare");
 
   return (
-    <section id="why-care" className="py-16 sm:py-20 px-4">
+    <section id="why-care" className="scroll-mt-14 py-16 sm:py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <ScrollReveal>
           <span className="text-xs font-mono font-medium text-accent-amber tracking-widest uppercase">
@@ -35,7 +35,7 @@ export function WhyCare() {
                 <div className="text-[10px] text-muted font-mono">FRED / FEDFUNDS</div>
               </div>
               <InterestRateChart />
-              <p className="mt-3 text-[11px] text-muted">From FRED API (Federal Reserve Economic Data)</p>
+              <p className="mt-3 text-[11px] text-muted">{t("sourceFred")}</p>
             </div>
           </ScrollReveal>
 
@@ -48,7 +48,7 @@ export function WhyCare() {
                 <div className="text-[10px] text-muted font-mono">Banxico / SF43718</div>
               </div>
               <ExchangeRateChart />
-              <p className="mt-3 text-[11px] text-muted">From Banxico API (Banco de Mexico)</p>
+              <p className="mt-3 text-[11px] text-muted">{t("sourceBanxico")}</p>
             </div>
           </ScrollReveal>
 
@@ -61,7 +61,7 @@ export function WhyCare() {
                 <div className="text-[10px] text-muted font-mono">World Bank / SP.DYN.LE00.IN</div>
               </div>
               <MortalityCurve />
-              <p className="mt-3 text-[11px] text-muted">From World Bank API (Development Indicators)</p>
+              <p className="mt-3 text-[11px] text-muted">{t("sourceWorldBank")}</p>
             </div>
           </ScrollReveal>
 
@@ -71,10 +71,10 @@ export function WhyCare() {
                 <div className="text-xs font-semibold uppercase tracking-wider text-accent-indigo">
                   {t("riskMetrics")}
                 </div>
-                <div className="text-[10px] text-muted font-mono">Combined APIs</div>
+                <div className="text-[10px] text-muted font-mono">{t("combinedLabel")}</div>
               </div>
               <RiskMetricsPanel />
-              <p className="mt-3 text-[11px] text-muted">Combined from FRED, Banxico, and World Bank APIs</p>
+              <p className="mt-3 text-[11px] text-muted">{t("sourceCombined")}</p>
             </div>
           </ScrollReveal>
         </div>

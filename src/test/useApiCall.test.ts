@@ -117,4 +117,83 @@ describe("useApiCall", () => {
 
     expect(result.current.requestUrl).toBe(url);
   });
+
+  it("ignores an older response that finishes after a newer request", async () => {
+    let resolveFirst!: (value: object) => void;
+    const firstResponse = new Promise<object>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockReturnValueOnce(firstResponse)
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: () => Promise.resolve({ request: "second" }),
+        })
+    );
+    const { result } = renderHook(() => useApiCall());
+
+    let firstExecution!: Promise<void>;
+    await act(async () => {
+      firstExecution = result.current.execute("/api/first");
+      await result.current.execute("/api/second");
+    });
+    resolveFirst({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: () => Promise.resolve({ request: "first" }),
+    });
+    await act(async () => firstExecution);
+
+    expect(result.current.data).toEqual({ request: "second" });
+    expect(result.current.requestUrl).toBe("/api/second");
+  });
+
+  it("does not repopulate state after reset", async () => {
+    let resolveRequest!: (value: object) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockReturnValue(
+        new Promise<object>((resolve) => {
+          resolveRequest = resolve;
+        })
+      )
+    );
+    const { result } = renderHook(() => useApiCall());
+
+    let execution!: Promise<void>;
+    act(() => {
+      execution = result.current.execute("/api/test");
+    });
+    act(() => result.current.reset());
+    resolveRequest({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: () => Promise.resolve({ result: "late" }),
+    });
+    await act(async () => execution);
+
+    expect(result.current.status).toBe("idle");
+    expect(result.current.data).toBeNull();
+  });
+
+  it("uses a text error body when the response is not JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        headers: new Headers({ "content-type": "text/plain" }),
+        text: () => Promise.resolve("Upstream unavailable"),
+      })
+    );
+    const { result } = renderHook(() => useApiCall());
+
+    await act(async () => result.current.execute("/api/test"));
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toBe("Upstream unavailable");
+  });
 });

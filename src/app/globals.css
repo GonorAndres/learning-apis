@@ -35,7 +35,7 @@
 }
 
 [data-theme="dark"] {
-  --background: #09090b;
+  --background: #000000;
   --foreground: #fafafa;
   --muted: #a1a1aa;
   --border: #27272a;
@@ -68,6 +68,20 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ::selection {

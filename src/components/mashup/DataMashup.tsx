@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -78,27 +78,66 @@ export function DataMashup() {
   const [result, setResult] = useState<ReturnType<MashupPreset["merge"]> | null>(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const activeRun = useRef<{ id: number; controller: AbortController } | null>(null);
+  const nextRunId = useRef(0);
 
   async function runMashup() {
+    activeRun.current?.controller.abort();
+    const run = { id: ++nextRunId.current, controller: new AbortController() };
+    activeRun.current = run;
     setLoading(true);
     setResult(null);
+    setError(null);
     const preset = PRESETS[selected];
 
-    setStep(1);
-    const responses = await Promise.all(preset.sources.map((s) => fetch(s.url).then((r) => r.json())));
+    try {
+      setStep(1);
+      const responses = await Promise.all(
+        preset.sources.map(async (source) => {
+          const response = await fetch(source.url, { signal: run.controller.signal });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })
+      );
 
-    setStep(2);
-    await new Promise((r) => setTimeout(r, 500));
+      if (activeRun.current?.id !== run.id) return;
+      setStep(2);
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-    setStep(3);
-    const merged = preset.merge(responses);
+      if (activeRun.current?.id !== run.id) return;
+      setStep(3);
+      const merged = preset.merge(responses);
 
-    setStep(4);
-    await new Promise((r) => setTimeout(r, 300));
+      setStep(4);
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-    setResult(merged);
-    setLoading(false);
+      if (activeRun.current?.id !== run.id) return;
+      setResult(merged);
+    } catch (runError) {
+      if (activeRun.current?.id !== run.id) return;
+      if (!(runError instanceof DOMException && runError.name === "AbortError")) {
+        setError(t("error"));
+      }
+    } finally {
+      if (activeRun.current?.id === run.id) setLoading(false);
+    }
   }
+
+  function selectPreset(index: number) {
+    activeRun.current?.controller.abort();
+    activeRun.current = null;
+    nextRunId.current += 1;
+    setSelected(index);
+    setResult(null);
+    setError(null);
+    setLoading(false);
+    setStep(0);
+  }
+
+  useEffect(() => {
+    return () => activeRun.current?.controller.abort();
+  }, []);
 
   return (
     <section id="mashup" className="py-16 sm:py-20 px-4">
@@ -131,7 +170,7 @@ export function DataMashup() {
           <div className="text-xs text-muted uppercase tracking-wider mb-3">{t("preset")}</div>
           <div className="flex gap-3 mb-6">
             {PRESETS.map((p, i) => (
-              <button key={i} onClick={() => { setSelected(i); setResult(null); setStep(0); }}
+              <button key={i} onClick={() => selectPreset(i)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${i === selected ? "border-accent-emerald/30 bg-accent-emerald/10 text-accent-emerald" : "border-border text-muted hover:text-foreground"}`}>
                 {p.label}
               </button>
@@ -158,9 +197,11 @@ export function DataMashup() {
             </button>
           )}
 
+          {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+
           {result && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-surface p-6">
-              <div className="text-xs text-muted mb-4">{result.data.length} merged data points</div>
+              <div className="text-xs text-muted mb-4">{t("mergedPoints", { count: result.data.length })}</div>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={result.data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -176,7 +217,7 @@ export function DataMashup() {
               </ResponsiveContainer>
               <div className="mt-4 flex justify-center">
                 <button onClick={() => { setResult(null); setStep(0); }} className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted hover:text-foreground">
-                  {t("runMashup")} again
+                  {t("runAgain")}
                 </button>
               </div>
             </motion.div>

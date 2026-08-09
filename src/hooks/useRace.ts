@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useCallHistory } from "./useCallHistory";
 
 export type RacerResult = {
@@ -38,9 +38,17 @@ export function useRace() {
   const [raceStatus, setRaceStatus] = useState<"idle" | "racing" | "done">("idle");
   const [history, setHistory] = useState<RacerResult[][]>([]);
   const animFrames = useRef<number[]>([]);
+  const activeRace = useRef<{ id: number; controllers: AbortController[] } | null>(null);
+  const nextRaceId = useRef(0);
   const addRecord = useCallHistory((s) => s.addRecord);
 
   const startRace = useCallback(async () => {
+    activeRace.current?.controllers.forEach((controller) => controller.abort());
+    const race = {
+      id: ++nextRaceId.current,
+      controllers: RACERS.map(() => new AbortController()),
+    };
+    activeRace.current = race;
     setRaceStatus("racing");
     setRacers(RACERS.map((r) => ({ ...r, status: "racing", progress: 0, result: null })));
 
@@ -53,6 +61,7 @@ export function useRace() {
 
     RACERS.forEach((_, i) => {
       const animate = () => {
+        if (activeRace.current?.id !== race.id) return;
         const elapsed = performance.now() - startTimes[i];
         const fakeProgress = 92 * (1 - Math.exp(-elapsed / 1200));
         if (progressValues[i] < 100) {
@@ -75,9 +84,11 @@ export function useRace() {
     const promises = RACERS.map(async (racer, i) => {
       try {
         const start = performance.now();
-        const res = await fetch(racer.url);
+        const res = await fetch(racer.url, { signal: race.controllers[i].signal });
         const body = await res.text();
         const latency = Math.round(performance.now() - start);
+
+        if (activeRace.current?.id !== race.id) return;
 
         cancelAnimationFrame(animFrames.current[i]);
 
@@ -93,6 +104,13 @@ export function useRace() {
 
         results.push(result);
 
+        let responseBody: unknown = body;
+        try {
+          responseBody = JSON.parse(body);
+        } catch {
+          // The debugger can still display non-JSON API responses.
+        }
+
         addRecord({
           apiId: racer.apiId,
           apiName: racer.name,
@@ -101,7 +119,7 @@ export function useRace() {
           url: racer.url,
           status: res.status,
           latency,
-          responseBody: JSON.parse(body),
+          responseBody,
           responseSize: body.length,
         });
 
@@ -111,6 +129,7 @@ export function useRace() {
           return next;
         });
       } catch {
+        if (activeRace.current?.id !== race.id) return;
         cancelAnimationFrame(animFrames.current[i]);
         const latency = Math.round(performance.now() - startTimes[i]);
         const result: RacerResult = {
@@ -132,14 +151,25 @@ export function useRace() {
     });
 
     await Promise.all(promises);
+    if (activeRace.current?.id !== race.id) return;
     setRaceStatus("done");
     setHistory((prev) => [...prev, results.sort((a, b) => a.latency - b.latency)]);
-  }, []);
+  }, [addRecord]);
 
   const reset = useCallback(() => {
+    activeRace.current?.controllers.forEach((controller) => controller.abort());
+    activeRace.current = null;
+    nextRaceId.current += 1;
     animFrames.current.forEach(cancelAnimationFrame);
     setRacers(RACERS.map((r) => ({ ...r, status: "waiting", progress: 0, result: null })));
     setRaceStatus("idle");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      activeRace.current?.controllers.forEach((controller) => controller.abort());
+      animFrames.current.forEach(cancelAnimationFrame);
+    };
   }, []);
 
   return { racers, raceStatus, history, startRace, reset };

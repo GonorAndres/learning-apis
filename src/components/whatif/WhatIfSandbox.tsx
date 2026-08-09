@@ -55,18 +55,42 @@ export function WhatIfSandbox() {
   const [realData, setRealData] = useState<{ x: string; y: number }[]>([]);
   const [adjustment, setAdjustment] = useState(SCENARIOS[0].defaultAdjust);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const scenario = SCENARIOS[selected];
 
   useEffect(() => {
+    const controller = new AbortController();
+    const selectedScenario = SCENARIOS[selected];
+
+    async function loadScenario() {
+      try {
+        const response = await fetch(selectedScenario.url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!controller.signal.aborted) setRealData(selectedScenario.extract(data));
+      } catch {
+        if (!controller.signal.aborted) {
+          setRealData([]);
+          setError(t("error"));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadScenario();
+    return () => controller.abort();
+  }, [selected, t]);
+
+  function selectScenario(index: number) {
+    if (index === selected) return;
+    setSelected(index);
+    setAdjustment(SCENARIOS[index].defaultAdjust);
+    setRealData([]);
+    setError(null);
     setLoading(true);
-    setAdjustment(SCENARIOS[selected].defaultAdjust);
-    fetch(SCENARIOS[selected].url)
-      .then((r) => r.json())
-      .then((data) => setRealData(SCENARIOS[selected].extract(data)))
-      .catch(() => setRealData([]))
-      .finally(() => setLoading(false));
-  }, [selected]);
+  }
 
   const chartData = realData.map((d) => ({
     x: d.x,
@@ -105,7 +129,7 @@ export function WhatIfSandbox() {
           <div className="text-xs text-muted uppercase tracking-wider mb-3">{t("scenario")}</div>
           <div className="flex flex-wrap gap-3 mb-6">
             {SCENARIOS.map((s, i) => (
-              <button key={i} onClick={() => setSelected(i)}
+              <button key={i} onClick={() => selectScenario(i)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${i === selected ? "border-accent-amber/30 bg-accent-amber/10 text-accent-amber" : "border-border text-muted hover:text-foreground"}`}>
                 {s.label}
               </button>
@@ -156,6 +180,7 @@ export function WhatIfSandbox() {
               </ResponsiveContainer>
             </motion.div>
           )}
+          {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
         </div>
       </div>
     </section>

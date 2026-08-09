@@ -1,8 +1,10 @@
 node_modules
 .next
+.open-next
 .git
 subagents_outputs
 .playwright-mcp
 .env.local
+.dev.vars
 *.png
 *.output

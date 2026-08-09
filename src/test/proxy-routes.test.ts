@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { NextRequest } from "next/server";
 import fredSample from "@/data/samples/fred-dgs10.json";
 import banxicoSample from "@/data/samples/banxico-usdmxn.json";
 import worldbankSample from "@/data/samples/worldbank-mortality-mex.json";
@@ -8,8 +9,13 @@ const mockNextRequest = (params: Record<string, string>) => {
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
-  return { nextUrl: url } as any;
+  return { nextUrl: url } as NextRequest;
 };
+
+const mockUpstreamResponse = (data: unknown, status = 200) => ({
+  status,
+  json: () => Promise.resolve(data),
+});
 
 describe("FRED proxy route", () => {
   beforeEach(() => {
@@ -26,9 +32,7 @@ describe("FRED proxy route", () => {
 
   it("injects api_key and file_type into upstream request", async () => {
     vi.stubEnv("FRED_API_KEY", "my-real-key");
-    const mockFetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(fredSample),
-    });
+    const mockFetch = vi.fn().mockResolvedValue(mockUpstreamResponse(fredSample));
     vi.stubGlobal("fetch", mockFetch);
 
     const { GET } = await import("@/app/api/proxy/fred/route");
@@ -38,6 +42,41 @@ describe("FRED proxy route", () => {
     expect(calledUrl).toContain("api_key=my-real-key");
     expect(calledUrl).toContain("file_type=json");
     expect(calledUrl).not.toContain("path=");
+  });
+
+  it("does not allow callers to override server-controlled parameters", async () => {
+    vi.stubEnv("FRED_API_KEY", "server-key");
+    const mockFetch = vi.fn().mockResolvedValue(mockUpstreamResponse(fredSample));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { GET } = await import("@/app/api/proxy/fred/route");
+    await GET(mockNextRequest({ api_key: "attacker-key", file_type: "xml" }));
+
+    const calledUrl = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("api_key")).toBe("server-key");
+    expect(calledUrl.searchParams.get("file_type")).toBe("json");
+  });
+
+  it("requires credentials instead of returning the wrong sample series", async () => {
+    vi.stubEnv("FRED_API_KEY", "");
+    const { GET } = await import("@/app/api/proxy/fred/route");
+
+    const res = await GET(mockNextRequest({ series_id: "FEDFUNDS" }));
+
+    expect(res.status).toBe(503);
+  });
+
+  it("preserves upstream error status", async () => {
+    vi.stubEnv("FRED_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(mockUpstreamResponse({ error: "Rate limited" }, 429))
+    );
+    const { GET } = await import("@/app/api/proxy/fred/route");
+
+    const res = await GET(mockNextRequest({ series_id: "DGS10" }));
+
+    expect(res.status).toBe(429);
   });
 });
 
@@ -56,9 +95,7 @@ describe("Banxico proxy route", () => {
 
   it("sends Bmx-Token header and requests JSON format", async () => {
     vi.stubEnv("BANXICO_TOKEN", "bmx-token-123");
-    const mockFetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(banxicoSample),
-    });
+    const mockFetch = vi.fn().mockResolvedValue(mockUpstreamResponse(banxicoSample));
     vi.stubGlobal("fetch", mockFetch);
 
     const { GET } = await import("@/app/api/proxy/banxico/route");
@@ -70,6 +107,28 @@ describe("Banxico proxy route", () => {
     const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
     expect(calledUrl).toContain("mediaType=json");
     expect((fetchOptions.headers as Record<string, string>)["Bmx-Token"]).toBe("bmx-token-123");
+  });
+
+  it("rejects invalid or reversed dates", async () => {
+    vi.stubEnv("BANXICO_TOKEN", "test-token");
+    const { GET } = await import("@/app/api/proxy/banxico/route");
+
+    const invalid = await GET(mockNextRequest({ startDate: "2024-02-30" }));
+    const reversed = await GET(
+      mockNextRequest({ startDate: "2024-02-01", endDate: "2024-01-01" })
+    );
+
+    expect(invalid.status).toBe(400);
+    expect(reversed.status).toBe(400);
+  });
+
+  it("requires credentials instead of returning a different sample series", async () => {
+    vi.stubEnv("BANXICO_TOKEN", "");
+    const { GET } = await import("@/app/api/proxy/banxico/route");
+
+    const res = await GET(mockNextRequest({ series: "SF283" }));
+
+    expect(res.status).toBe(503);
   });
 });
 
@@ -86,9 +145,7 @@ describe("World Bank proxy route", () => {
   });
 
   it("constructs correct World Bank URL with JSON format", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(worldbankSample),
-    });
+    const mockFetch = vi.fn().mockResolvedValue(mockUpstreamResponse(worldbankSample));
     vi.stubGlobal("fetch", mockFetch);
 
     const { GET } = await import("@/app/api/proxy/worldbank/route");
@@ -96,9 +153,31 @@ describe("World Bank proxy route", () => {
       mockNextRequest({ country: "MEX", indicator: "SP.DYN.CDRT.IN", date: "2000:2023" })
     );
 
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    const calledUrl = String(mockFetch.mock.calls[0][0]);
     expect(calledUrl).toContain("/country/MEX/indicator/SP.DYN.CDRT.IN");
     expect(calledUrl).toContain("format=json");
+  });
+
+  it("rejects invalid date ranges", async () => {
+    const { GET } = await import("@/app/api/proxy/worldbank/route");
+
+    const invalid = await GET(mockNextRequest({ date: "recent" }));
+    const reversed = await GET(mockNextRequest({ date: "2024:2020" }));
+
+    expect(invalid.status).toBe(400);
+    expect(reversed.status).toBe(400);
+  });
+
+  it("preserves upstream error status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(mockUpstreamResponse({ message: "Unavailable" }, 503))
+    );
+    const { GET } = await import("@/app/api/proxy/worldbank/route");
+
+    const res = await GET(mockNextRequest({}));
+
+    expect(res.status).toBe(503);
   });
 });
 

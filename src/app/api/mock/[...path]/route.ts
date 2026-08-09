@@ -1,82 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getContract, generateResponse, registerContract } from "@/lib/mock-registry";
+import { evaluateContract } from "@/lib/mock-registry";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
+type RouteContext = { params: Promise<{ path: string[] }> };
+
+export async function GET() {
+  return NextResponse.json(
+    { error: "Mock contracts are evaluated as previews and are not persisted" },
+    { status: 405, headers: { Allow: "POST" } }
+  );
+}
+
+export async function POST(req: NextRequest, { params }: RouteContext) {
   const { path } = await params;
-  const fullPath = `/api/mock/${path.join("/")}`;
-
-  if (path[0] === "_register") {
-    return NextResponse.json({ error: "Use POST to register" }, { status: 405 });
-  }
-
-  const contract = getContract("GET", fullPath);
-  if (!contract) {
+  if (path.length !== 1 || path[0] !== "_evaluate") {
     return NextResponse.json(
-      { error: "No contract registered for this endpoint", path: fullPath },
+      { error: "Use /api/mock/_evaluate to preview a contract" },
       { status: 404 }
     );
   }
 
-  const queryParams: Record<string, string> = {};
-  req.nextUrl.searchParams.forEach((v, k) => {
-    queryParams[k] = v;
-  });
-
-  for (const p of contract.params) {
-    if (p.required && !queryParams[p.name]) {
-      return NextResponse.json(
-        { error: `Missing required parameter: ${p.name}` },
-        { status: 400 }
-      );
-    }
-  }
-
-  const body = generateResponse(contract, queryParams);
-
   try {
-    const parsed = JSON.parse(body);
-    return NextResponse.json(parsed);
-  } catch {
-    return new Response(body, {
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
-
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  const { path } = await params;
-
-  if (path[0] === "_register") {
-    try {
-      const contract = await req.json();
-      registerContract(contract);
-      return NextResponse.json({ registered: true, path: contract.path });
-    } catch {
-      return NextResponse.json({ error: "Invalid contract" }, { status: 400 });
+    const input: unknown = await req.json();
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      return NextResponse.json({ error: "Invalid evaluation request" }, { status: 400 });
     }
-  }
 
-  const fullPath = `/api/mock/${path.join("/")}`;
-  const contract = getContract("POST", fullPath);
-  if (!contract) {
-    return NextResponse.json({ error: "No contract registered", path: fullPath }, { status: 404 });
-  }
+    const { contract, values } = input as Record<string, unknown>;
+    const result = evaluateContract(contract, values);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
 
-  const queryParams: Record<string, string> = {};
-  req.nextUrl.searchParams.forEach((v, k) => {
-    queryParams[k] = v;
-  });
-
-  const body = generateResponse(contract, queryParams);
-  try {
-    return NextResponse.json(JSON.parse(body));
+    return NextResponse.json(result.body);
   } catch {
-    return new Response(body, { headers: { "Content-Type": "application/json" } });
+    return NextResponse.json({ error: "Invalid evaluation request" }, { status: 400 });
   }
 }

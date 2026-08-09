@@ -23,7 +23,7 @@ export function BuildYourOwn() {
   const t = useTranslations("buildOwn");
 
   return (
-    <section id="build-own" className="py-16 sm:py-20 px-4 bg-surface">
+    <section id="build-own" className="scroll-mt-14 py-16 sm:py-20 px-4 bg-surface">
       <div className="max-w-6xl mx-auto">
         <ScrollReveal>
           <span className="text-xs font-mono font-medium text-accent-indigo tracking-widest uppercase">

@@ -201,12 +201,14 @@ function CallSummary({ record }: { record: CallRecord }) {
 }
 
 function DiffPanel({ left, right }: { left: unknown; right: unknown }) {
+  let diff;
   try {
-    const diff = differ.diff(left, right);
-    return <Viewer diff={diff} indent={2} lineNumbers />;
+    diff = differ.diff(left, right);
   } catch {
     return (
       <div className="text-xs text-muted">Unable to compute diff</div>
     );
   }
+
+  return <Viewer diff={diff} indent={2} lineNumbers />;
 }
