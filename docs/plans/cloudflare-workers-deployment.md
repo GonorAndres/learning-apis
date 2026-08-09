@@ -1,6 +1,6 @@
 # Cloudflare Workers Deployment
 
-Status: local implementation verified on 2026-08-09, production actions pending
+Status: PR #1 open and verified on 2026-08-09, secret versions and deployment pending
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Status: local implementation verified on 2026-08-09, production actions pending
 - [x] Add PR tests, lint, Next build, and Worker build.
 - [x] Order production deployment as backend, frontend, then smoke tests.
 - [x] Remove plain credential values from the deployment workflow.
-- [ ] Rotate the exposed FRED and Banxico credentials.
+- [x] Rotate the exposed FRED and Banxico credentials.
 - [x] Create `fred-api-key` and `banxico-token` containers in Secret Manager.
 - [ ] Add the rotated values as versions of both Secret Manager secrets.
 - [x] Grant the Cloud Run runtime service account Secret Manager Secret
@@ -29,9 +29,9 @@ Status: local implementation verified on 2026-08-09, production actions pending
 - [x] Verify Cloudflare API authentication and configure the GitHub Actions
   account ID and API token secrets.
 - [x] Run the complete local verification suite.
-- [ ] Obtain approval for git and production infrastructure actions.
-- [ ] Create a branch, commit, push, and open a pull request.
-- [ ] Require pull requests and the `verify` check on `main`.
+- [x] Obtain approval for git and production infrastructure actions.
+- [x] Create a branch, commit, push, and open pull request #1.
+- [x] Require pull requests and the `verify` check on `main`.
 
 ## Secret Migration
 

@@ -53,9 +53,11 @@ The production build still reports Next.js's existing warning that
 
 Cloudflare Workers migration work is tracked in
 `docs/plans/cloudflare-workers-deployment.md`. Local configuration and CI are
-implemented and locally verified. Credential rotation, Secret Manager setup,
-deployment, custom-domain creation, and git actions still require explicit user
-approval.
+implemented and verified locally and in PR #1. Secret containers and runtime IAM
+bindings exist, repository Cloudflare secrets are configured, and `main` now
+requires pull requests and the `verify` check. Add the rotated credential values
+as Secret Manager versions before merging; merge-triggered deployment and smoke
+tests remain pending.
 
 ## Preview
 
