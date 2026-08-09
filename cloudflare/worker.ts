@@ -14,7 +14,7 @@ function isApiPath(pathname: string) {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env, ctx: WorkerExecutionContext) {
     const url = new URL(request.url);
 
@@ -29,3 +29,5 @@ export default {
     return fetch(new Request(backend, request));
   },
 };
+
+export default worker;
