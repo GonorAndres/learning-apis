@@ -23,7 +23,7 @@ Status: PR #1 open and verified on 2026-08-09, secret versions and deployment pe
 - [x] Remove plain credential values from the deployment workflow.
 - [x] Rotate the exposed FRED and Banxico credentials.
 - [x] Create `fred-api-key` and `banxico-token` containers in Secret Manager.
-- [ ] Add the rotated values as versions of both Secret Manager secrets.
+- [x] Add the rotated values as versions of both Secret Manager secrets.
 - [x] Grant the Cloud Run runtime service account Secret Manager Secret
   Accessor on both secrets.
 - [x] Verify Cloudflare API authentication and configure the GitHub Actions
