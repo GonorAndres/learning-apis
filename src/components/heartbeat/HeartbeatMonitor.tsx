@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
+import { classifyHealth } from "@/lib/api-health";
 
 type ApiHealth = {
   apiId: string;
@@ -23,7 +24,7 @@ const APIS = [
   { apiId: "custom", name: "Your API", color: "#6366f1", url: "/api/mortality?age=45" },
 ];
 
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 30;
 
 export function HeartbeatMonitor() {
   const t = useTranslations("heartbeat");
@@ -41,11 +42,18 @@ export function HeartbeatMonitor() {
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 5000);
-          const res = await fetch(api.url, { signal: controller.signal });
-          clearTimeout(timeout);
-          const latency = Math.round(performance.now() - start);
-          const status: "healthy" | "slow" = latency > 2000 ? "slow" : res.ok ? "healthy" : "slow";
-          return { apiId: api.apiId, latency, status, ok: true };
+          try {
+            const res = await fetch(api.url, { signal: controller.signal });
+            const latency = Math.round(performance.now() - start);
+            return {
+              apiId: api.apiId,
+              latency,
+              status: classifyHealth(res.ok, latency),
+              ok: res.ok,
+            };
+          } finally {
+            clearTimeout(timeout);
+          }
         } catch {
           const latency = Math.round(performance.now() - start);
           return { apiId: api.apiId, latency, status: "down" as const, ok: false };
@@ -72,9 +80,10 @@ export function HeartbeatMonitor() {
   }, []);
 
   useEffect(() => {
-    pingAll();
+    const initialPing = setTimeout(pingAll, 0);
     intervalRef.current = setInterval(pingAll, 15000);
     return () => {
+      clearTimeout(initialPing);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [pingAll]);

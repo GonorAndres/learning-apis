@@ -2,9 +2,13 @@
 
 Interactive educational web app about APIs. From concept to practice, with live data.
 
+Repository-wide working instructions are in `AGENTS.md`. Read and follow that
+file before making changes. The active infrastructure migration is tracked in
+`docs/plans/cloudflare-workers-deployment.md`.
+
 ## Tech Stack
 
-- **Framework**: Next.js 16.2.4 (App Router, Turbopack)
+- **Framework**: Next.js 16.2.11 (App Router, Turbopack)
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS v4 (`@tailwindcss/postcss`)
 - **Animation**: Framer Motion
@@ -13,7 +17,7 @@ Interactive educational web app about APIs. From concept to practice, with live 
 - **State**: Zustand (call history store)
 - **Diff**: json-diff-kit (debugger diff view)
 - **Testing**: Vitest + @testing-library/react
-- **Deploy target**: Vercel (needs serverless for proxy routes)
+- **Deploy targets**: Cloudflare Workers frontend, Cloud Run API backend
 
 ## Project Structure
 
@@ -87,13 +91,15 @@ BANXICO_TOKEN=      # Free: https://www.banxico.org.mx/SieAPIRest/service/v1/tok
 
 World Bank API needs no key. Without keys, FRED and Banxico serve sample/fallback data.
 
-For deployment (Vercel/Cloud Run), set these as environment variables in the service config.
+For Cloud Run, bind these values from Google Secret Manager. Never store them as
+plain service environment values.
 
 ## Commands
 
 ```bash
 npm run dev          # Start dev server
 npm run build        # Production build
+npm run build:worker # OpenNext Cloudflare Worker build
 npm test             # Run all tests (vitest)
 npm run test:watch   # Watch mode
 ```

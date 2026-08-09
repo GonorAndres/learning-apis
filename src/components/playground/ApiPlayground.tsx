@@ -6,16 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { API_REGISTRY } from "@/lib/api-registry";
 import { useApiCall } from "@/hooks/useApiCall";
 
-const ENUM_LABELS: Record<string, string> = {
-  d: "Daily",
-  w: "Weekly",
-  m: "Monthly",
-  q: "Quarterly",
-  a: "Annual",
-  single: "Single age",
-  table: "Full table",
-};
-
 const colorMap: Record<string, { tab: string; active: string; border: string }> = {
   blue: {
     tab: "text-accent-blue",
@@ -39,12 +29,20 @@ const colorMap: Record<string, { tab: string; active: string; border: string }> 
   },
 };
 
+function defaultParams(apiIndex: number) {
+  return Object.fromEntries(
+    API_REGISTRY[apiIndex].endpoints[0].params
+      .filter((param) => param.default)
+      .map((param) => [param.name, param.default!])
+  );
+}
+
 export function ApiPlayground() {
   const t = useTranslations("tryIt");
   const [selectedApi, setSelectedApi] = useState(0);
-  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() => defaultParams(0));
   const [responseTab, setResponseTab] = useState<"raw" | "formatted">("formatted");
-  const { status, data, error, latency, execute } = useApiCall();
+  const { status, data, error, latency, execute, reset } = useApiCall();
 
   const api = API_REGISTRY[selectedApi];
   const endpoint = api.endpoints[0];
@@ -68,7 +66,9 @@ export function ApiPlayground() {
 
   function handleApiChange(index: number) {
     setSelectedApi(index);
-    setParamValues({});
+    setParamValues(defaultParams(index));
+    setResponseTab("formatted");
+    reset();
   }
 
   return (
@@ -90,7 +90,7 @@ export function ApiPlayground() {
             >
               <span className="font-semibold">{a.name}</span>
               <span className="hidden sm:inline text-xs opacity-70 ml-2">
-                {a.description}
+                {t(`api.${a.id}` as "api.fred")}
               </span>
             </button>
           );
@@ -103,14 +103,14 @@ export function ApiPlayground() {
           <span className="text-xs font-medium text-muted uppercase tracking-wider">
             {t("quickFill")}
           </span>
-          {api.quickFills.map((qf) => (
+          {api.quickFills.map((qf, index) => (
             <button
               key={qf.label}
               onClick={() => setParamValues(qf.values)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:border-current ${colors.border} ${colors.tab}`}
-              title={qf.description}
+              title={t(`quickFillDescriptions.${api.id}${index + 1}` as "quickFillDescriptions.fred1")}
             >
-              {qf.label}
+              {t(`quickFills.${api.id}${index + 1}` as "quickFills.fred1")}
             </button>
           ))}
         </div>
@@ -132,7 +132,7 @@ export function ApiPlayground() {
                       {param.name}
                     </span>
                     {param.required && (
-                      <span className="text-red-400 text-[10px]">required</span>
+                      <span className="text-red-400 text-[10px]">{t("required")}</span>
                     )}
                   </label>
                   {param.type === "enum" && param.values ? (
@@ -148,14 +148,14 @@ export function ApiPlayground() {
                     >
                       {param.values.map((v) => (
                         <option key={v} value={v}>
-                          {ENUM_LABELS[v] || v}
+                          {t(`enum.${v}` as "enum.d")}
                         </option>
                       ))}
                     </select>
                   ) : (
                     <input
                       type="text"
-                      placeholder={param.default || param.description}
+                      placeholder={param.default || t(`params.${api.id}.${param.name}` as "params.fred.series_id")}
                       value={paramValues[param.name] || ""}
                       onChange={(e) =>
                         setParamValues((prev) => ({
@@ -166,7 +166,9 @@ export function ApiPlayground() {
                       className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-border bg-background text-foreground placeholder:text-muted/50 focus:outline-none focus:border-muted"
                     />
                   )}
-                  <p className="mt-1 text-[11px] text-muted/60">{param.description}</p>
+                  <p className="mt-1 text-[11px] text-muted/60">
+                    {t(`params.${api.id}.${param.name}` as "params.fred.series_id")}
+                  </p>
                 </div>
               ))}
             </div>
@@ -198,7 +200,7 @@ export function ApiPlayground() {
               </div>
               {api.baseUrl.startsWith("http") && (
                 <div className="text-[11px] text-muted/60">
-                  Real endpoint: <span className="font-mono text-muted/80">{api.baseUrl}</span>
+                  {t("realEndpoint")}: <span className="font-mono text-muted/80">{api.baseUrl}</span>
                 </div>
               )}
             </div>
@@ -336,6 +338,7 @@ function FormattedResponse({ apiId, data }: { apiId: string; data: unknown }) {
 }
 
 function FredFormatted({ data }: { data: unknown }) {
+  const t = useTranslations("tryIt");
   const d = data as { observations?: { date: string; value: string }[] };
   const obs = d.observations;
   if (!obs || !Array.isArray(obs)) {
@@ -346,13 +349,13 @@ function FredFormatted({ data }: { data: unknown }) {
   return (
     <div>
       <div className="text-xs text-muted mb-3">
-        {obs.length} observations (showing last {recent.length})
+        {t("observationsCount", { total: obs.length, shown: recent.length })}
       </div>
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-left text-muted border-b border-border">
-            <th className="pb-2 pr-4">Date</th>
-            <th className="pb-2">Value</th>
+            <th className="pb-2 pr-4">{t("date")}</th>
+            <th className="pb-2">{t("value")}</th>
           </tr>
         </thead>
         <tbody>
@@ -369,6 +372,7 @@ function FredFormatted({ data }: { data: unknown }) {
 }
 
 function BanxicoFormatted({ data }: { data: unknown }) {
+  const t = useTranslations("tryIt");
   const d = data as { bmx?: { series?: { datos?: { fecha: string; dato: string }[] }[] } };
   const datos = d.bmx?.series?.[0]?.datos;
   if (!datos || !Array.isArray(datos)) {
@@ -379,13 +383,13 @@ function BanxicoFormatted({ data }: { data: unknown }) {
   return (
     <div>
       <div className="text-xs text-muted mb-3">
-        {datos.length} data points (showing last {recent.length})
+        {t("dataPointsShown", { total: datos.length, shown: recent.length })}
       </div>
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-left text-muted border-b border-border">
-            <th className="pb-2 pr-4">Fecha</th>
-            <th className="pb-2">Dato</th>
+            <th className="pb-2 pr-4">{t("date")}</th>
+            <th className="pb-2">{t("value")}</th>
           </tr>
         </thead>
         <tbody>
@@ -402,6 +406,7 @@ function BanxicoFormatted({ data }: { data: unknown }) {
 }
 
 function WorldBankFormatted({ data }: { data: unknown }) {
+  const t = useTranslations("tryIt");
   const arr = data as unknown[];
   if (!Array.isArray(arr) || arr.length < 2) {
     return <FallbackJson data={data} />;
@@ -416,14 +421,14 @@ function WorldBankFormatted({ data }: { data: unknown }) {
   return (
     <div>
       <div className="text-xs text-muted mb-3">
-        {valid.length} data points
+        {t("dataPoints", { total: valid.length })}
         {valid[0]?.country?.value && ` | ${valid[0].country.value}`}
       </div>
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-left text-muted border-b border-border">
-            <th className="pb-2 pr-4">Year</th>
-            <th className="pb-2">Value</th>
+            <th className="pb-2 pr-4">{t("year")}</th>
+            <th className="pb-2">{t("value")}</th>
           </tr>
         </thead>
         <tbody>
@@ -442,6 +447,7 @@ function WorldBankFormatted({ data }: { data: unknown }) {
 }
 
 function CustomFormatted({ data }: { data: unknown }) {
+  const t = useTranslations("tryIt");
   const d = data as {
     age?: number;
     qx?: number;
@@ -458,7 +464,7 @@ function CustomFormatted({ data }: { data: unknown }) {
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-accent-amber/20 bg-accent-amber/5 p-4">
-          <div className="text-xs font-semibold text-accent-amber uppercase tracking-wider mb-2">API Usage</div>
+          <div className="text-xs font-semibold text-accent-amber uppercase tracking-wider mb-2">{t("apiUsage")}</div>
           <div className="space-y-2 text-xs text-foreground/80">
             <p>{d.usage.description}</p>
             <div className="font-mono bg-background/50 rounded p-2 space-y-1">
@@ -479,7 +485,7 @@ function CustomFormatted({ data }: { data: unknown }) {
         <table className="w-full text-xs font-mono">
           <thead>
             <tr className="text-left text-muted border-b border-border">
-              <th className="pb-2 pr-3">Age</th>
+              <th className="pb-2 pr-3">{t("age")}</th>
               <th className="pb-2 pr-3">qx</th>
               <th className="pb-2 pr-3">lx</th>
               <th className="pb-2">ex</th>
@@ -506,20 +512,20 @@ function CustomFormatted({ data }: { data: unknown }) {
         <div className="text-xs text-muted">{d.source}</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-border bg-surface-elevated p-4">
-            <div className="text-[11px] text-muted uppercase tracking-wider">Age</div>
+            <div className="text-[11px] text-muted uppercase tracking-wider">{t("age")}</div>
             <div className="mt-1 text-2xl font-bold text-accent-indigo">{d.age}</div>
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated p-4">
-            <div className="text-[11px] text-muted uppercase tracking-wider">Mortality Rate (qx)</div>
+            <div className="text-[11px] text-muted uppercase tracking-wider">{t("mortalityRate")}</div>
             <div className="mt-1 text-2xl font-bold text-accent-indigo">{d.qx?.toFixed(5)}</div>
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated p-4">
-            <div className="text-[11px] text-muted uppercase tracking-wider">Survivors (lx)</div>
+            <div className="text-[11px] text-muted uppercase tracking-wider">{t("survivors")}</div>
             <div className="mt-1 text-2xl font-bold text-foreground">{d.lx?.toLocaleString()}</div>
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated p-4">
-            <div className="text-[11px] text-muted uppercase tracking-wider">Life Expectancy (ex)</div>
-            <div className="mt-1 text-2xl font-bold text-foreground">{d.ex} yr</div>
+            <div className="text-[11px] text-muted uppercase tracking-wider">{t("lifeExpectancy")}</div>
+            <div className="mt-1 text-2xl font-bold text-foreground">{d.ex} {t("yearsShort")}</div>
           </div>
         </div>
         <div className="text-[11px] text-muted">{d.description}</div>

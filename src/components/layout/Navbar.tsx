@@ -5,25 +5,7 @@ import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
 import { useScrollSection } from "@/hooks/useScrollSection";
-
-const mainLinks = [
-  { id: "what-is-api", key: "concept", color: "text-accent-blue" },
-  { id: "try-it", key: "playground", color: "text-accent-emerald" },
-  { id: "why-care", key: "analysis", color: "text-accent-amber" },
-  { id: "build-own", key: "build", color: "text-accent-indigo" },
-];
-
-const advancedLinks = [
-  { id: "race", key: "labRace", color: "text-accent-blue" },
-  { id: "chaos", key: "labChaos", color: "text-red-400" },
-  { id: "debugger", key: "labDebug", color: "text-accent-indigo" },
-  { id: "heartbeat", key: "labHealth", color: "text-accent-emerald" },
-  { id: "reverse", key: "labReverse", color: "text-accent-amber" },
-  { id: "xray", key: "labXray", color: "text-accent-indigo" },
-  { id: "mashup", key: "labMashup", color: "text-accent-emerald" },
-  { id: "whatif", key: "labWhatif", color: "text-accent-amber" },
-  { id: "contract", key: "labContract", color: "text-accent-blue" },
-];
+import { ADVANCED_NAV_LINKS, MAIN_NAV_LINKS } from "@/lib/navigation";
 
 export function Navbar() {
   const t = useTranslations("nav");
@@ -35,7 +17,7 @@ export function Navbar() {
 
   const currentLocale = pathname.startsWith("/es") ? "es" : "en";
   const isAdvanced = pathname.includes("/advanced");
-  const navLinks = isAdvanced ? advancedLinks : mainLinks;
+  const navLinks = isAdvanced ? ADVANCED_NAV_LINKS : MAIN_NAV_LINKS;
 
   function switchLocale() {
     const targetLocale = currentLocale === "en" ? "es" : "en";
@@ -53,7 +35,7 @@ export function Navbar() {
           APIs
         </a>
 
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => {
             const label = t(link.key as "concept");
             return (
@@ -82,7 +64,8 @@ export function Navbar() {
           <button
             onClick={toggle}
             className="p-2 text-muted hover:text-foreground rounded-md border border-border/50 hover:border-border transition-colors"
-            aria-label="Toggle theme"
+            aria-label={t("toggleTheme")}
+            title={t("toggleTheme")}
           >
             {theme === "dark" ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -97,8 +80,8 @@ export function Navbar() {
           </button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 text-muted hover:text-foreground rounded-md border border-border/50 hover:border-border transition-colors"
-            aria-label="Toggle menu"
+            className="lg:hidden p-2 text-muted hover:text-foreground rounded-md border border-border/50 hover:border-border transition-colors"
+            aria-label={t("toggleMenu")}
           >
             {mobileOpen ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -118,8 +101,8 @@ export function Navbar() {
 
       {mobileOpen && (
         <>
-        <div className="md:hidden fixed inset-0 top-14 bg-black/50 z-40" onClick={() => setMobileOpen(false)} />
-        <div className="md:hidden relative z-50 border-t border-border/50 bg-background backdrop-blur-xl">
+        <div className="lg:hidden fixed inset-0 top-14 bg-black/50 z-40" onClick={() => setMobileOpen(false)} />
+        <div className="lg:hidden relative z-50 border-t border-border/50 bg-background backdrop-blur-xl">
           <div className="flex flex-col px-4 py-3 gap-1">
             {navLinks.map((link) => {
               const label = t(link.key as "concept");

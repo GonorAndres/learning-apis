@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 type ApiCallState = {
   status: "idle" | "loading" | "success" | "error";
@@ -12,6 +12,8 @@ type ApiCallState = {
 };
 
 export function useApiCall() {
+  const activeRequest = useRef<{ id: number; controller: AbortController } | null>(null);
+  const nextRequestId = useRef(0);
   const [state, setState] = useState<ApiCallState>({
     status: "idle",
     data: null,
@@ -21,6 +23,13 @@ export function useApiCall() {
   });
 
   const execute = useCallback(async (url: string) => {
+    activeRequest.current?.controller.abort();
+    const request = {
+      id: ++nextRequestId.current,
+      controller: new AbortController(),
+    };
+    activeRequest.current = request;
+
     setState({
       status: "loading",
       data: null,
@@ -32,15 +41,25 @@ export function useApiCall() {
     const start = performance.now();
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: request.controller.signal });
       const latency = Math.round(performance.now() - start);
-      const data = await response.json();
+      const contentType = response.headers?.get("content-type") || "application/json";
+      const data = contentType.includes("json")
+        ? await response.json()
+        : await response.text();
+
+      if (activeRequest.current?.id !== request.id) return;
 
       if (!response.ok) {
         setState({
           status: "error",
           data: null,
-          error: data.error || `HTTP ${response.status}`,
+          error:
+            typeof data === "object" && data !== null && "error" in data
+              ? String(data.error)
+              : typeof data === "string" && data
+                ? data
+                : `HTTP ${response.status}`,
           latency,
           requestUrl: url,
         });
@@ -48,7 +67,10 @@ export function useApiCall() {
       }
 
       setState({ status: "success", data, error: null, latency, requestUrl: url });
-    } catch {
+    } catch (error) {
+      if (activeRequest.current?.id !== request.id) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+
       const latency = Math.round(performance.now() - start);
       setState({
         status: "error",
@@ -61,6 +83,9 @@ export function useApiCall() {
   }, []);
 
   const reset = useCallback(() => {
+    activeRequest.current?.controller.abort();
+    activeRequest.current = null;
+    nextRequestId.current += 1;
     setState({
       status: "idle",
       data: null,
@@ -68,6 +93,10 @@ export function useApiCall() {
       latency: null,
       requestUrl: null,
     });
+  }, []);
+
+  useEffect(() => {
+    return () => activeRequest.current?.controller.abort();
   }, []);
 
   return { ...state, execute, reset };

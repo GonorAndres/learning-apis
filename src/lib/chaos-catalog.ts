@@ -11,6 +11,11 @@ export type ChaosChallenge = {
   color: string;
 };
 
+export function allowsCrossOrigin(headers: Headers, origin: string): boolean {
+  const allowedOrigin = headers.get("Access-Control-Allow-Origin");
+  return allowedOrigin === "*" || allowedOrigin === origin;
+}
+
 export const CHAOS_CATALOG: ChaosChallenge[] = [
   {
     code: "400",
@@ -149,10 +154,10 @@ export const CHAOS_CATALOG: ChaosChallenge[] = [
     name: "CORS Block",
     category: "network",
     difficulty: 3,
-    hint: "Request the chaos endpoint with nocors=true. The browser will block it.",
+    hint: "Inspect a response without CORS permission and model what a cross-origin browser request would do.",
     url: "/api/chaos?nocors=true",
     method: "CORS",
-    cause: "The server didn't include CORS headers, so the browser blocked the response for security.",
+    cause: "This same-origin lab found no CORS permission header. A browser would block page code from reading that response if it came from another origin.",
     fix: "Configure Access-Control-Allow-Origin on the server. Or use a backend proxy.",
     color: "#8b5cf6",
   },

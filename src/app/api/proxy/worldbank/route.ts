@@ -20,12 +20,25 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const url = `https://api.worldbank.org/v2/country/${country}/indicator/${indicator}?date=${date}&format=json&per_page=100`;
+  const dateMatch = date.match(/^(\d{4})(?::(\d{4}))?$/);
+  if (!dateMatch || (dateMatch[2] && dateMatch[1] > dateMatch[2])) {
+    return NextResponse.json(
+      { error: "Invalid date range" },
+      { status: 400 }
+    );
+  }
+
+  const url = new URL(
+    `https://api.worldbank.org/v2/country/${country}/indicator/${indicator}`
+  );
+  url.searchParams.set("date", date);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("per_page", "100");
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, { status: response.status });
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch from World Bank API" },

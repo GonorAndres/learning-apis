@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 
-type Param = { name: string; type: string; required: boolean; example: string };
+type Param = { name: string; type: "string" | "number" | "boolean"; required: boolean; example: string };
 
 type Contract = {
-  method: string;
+  method: "GET" | "POST";
   path: string;
   description: string;
   params: Param[];
@@ -30,7 +30,6 @@ export function ContractDesigner() {
   const [contract, setContract] = useState<Contract>(DEFAULT_CONTRACT);
   const [testResult, setTestResult] = useState<{ status: number; body: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  const [registered, setRegistered] = useState(false);
 
   function addParam() {
     setContract((c) => ({
@@ -51,31 +50,26 @@ export function ContractDesigner() {
     setContract((c) => ({ ...c, params: c.params.filter((_, idx) => idx !== i) }));
   }
 
-  async function registerAndTest() {
+  async function evaluateDesign() {
     setTesting(true);
     setTestResult(null);
 
     try {
-      await fetch("/api/mock/_register", {
+      const values = Object.fromEntries(
+        contract.params.filter((param) => param.example).map((param) => [param.name, param.example])
+      );
+      const res = await fetch("/api/mock/_evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(contract),
+        body: JSON.stringify({ contract, values }),
       });
-      setRegistered(true);
-
-      const params = new URLSearchParams();
-      contract.params.forEach((p) => {
-        if (p.example) params.set(p.name, p.example);
-      });
-
-      const url = `${contract.path}?${params.toString()}`;
-      const res = await fetch(url);
       const body = await res.text();
       setTestResult({ status: res.status, body });
     } catch {
-      setTestResult({ status: 0, body: "Failed to register or test the endpoint." });
+      setTestResult({ status: 0, body: t("requestFailed") });
+    } finally {
+      setTesting(false);
     }
-    setTesting(false);
   }
 
   return (
@@ -110,7 +104,7 @@ export function ContractDesigner() {
           <div className="rounded-xl border border-border bg-surface p-6 space-y-5">
             <div>
               <label className="text-xs text-muted uppercase tracking-wider">{t("method")}</label>
-              <select value={contract.method} onChange={(e) => setContract((c) => ({ ...c, method: e.target.value }))}
+              <select value={contract.method} onChange={(e) => setContract((c) => ({ ...c, method: e.target.value as Contract["method"] }))}
                 className="mt-1 w-full px-3 py-2 text-sm font-mono rounded-lg border border-border bg-background text-foreground focus:outline-none">
                 <option>GET</option><option>POST</option>
               </select>
@@ -132,7 +126,7 @@ export function ContractDesigner() {
                   <div key={i} className="flex gap-2 items-center">
                     <input value={p.name} onChange={(e) => updateParam(i, "name", e.target.value)} placeholder="name"
                       className="flex-1 px-2 py-1.5 text-xs font-mono rounded border border-border bg-background text-foreground focus:outline-none" />
-                    <select value={p.type} onChange={(e) => updateParam(i, "type", e.target.value)}
+                    <select value={p.type} onChange={(e) => updateParam(i, "type", e.target.value as Param["type"])}
                       className="px-2 py-1.5 text-xs font-mono rounded border border-border bg-background text-foreground focus:outline-none">
                       <option>string</option><option>number</option><option>boolean</option>
                     </select>
@@ -152,10 +146,10 @@ export function ContractDesigner() {
               <label className="text-xs text-muted uppercase tracking-wider">{t("responseSchema")}</label>
               <textarea value={contract.responseTemplate} onChange={(e) => setContract((c) => ({ ...c, responseTemplate: e.target.value }))} rows={6}
                 className="mt-1 w-full px-3 py-2 text-xs font-mono rounded-lg border border-border bg-background text-foreground focus:outline-none resize-none" />
-              <p className="mt-1 text-[10px] text-muted">{'Use {{param_name}} to echo parameters in the response.'}</p>
+              <p className="mt-1 text-[10px] text-muted">{t("templateHelp")}</p>
             </div>
 
-            <button onClick={registerAndTest} disabled={testing}
+            <button onClick={evaluateDesign} disabled={testing}
               className="w-full py-2.5 text-sm font-medium rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-40">
               {testing ? "..." : t("testEndpoint")}
             </button>
@@ -164,8 +158,9 @@ export function ContractDesigner() {
           {/* Result panel */}
           <div className="rounded-xl border border-border bg-surface p-6">
             <div className="text-xs text-muted uppercase tracking-wider mb-4">
-              {registered ? "Live endpoint" : "Preview"}
+              {t("preview")}
             </div>
+            <p className="mb-4 text-xs text-muted">{t("previewHelp")}</p>
 
             <div className="rounded-lg bg-background border border-border p-3 mb-4">
               <div className="text-xs font-mono">
@@ -177,7 +172,7 @@ export function ContractDesigner() {
                   <div key={p.name} className="text-[11px] font-mono text-muted">
                     <span className="text-foreground/70">{p.name}</span>
                     <span className="text-muted/50"> : {p.type}</span>
-                    {p.required && <span className="text-red-400 ml-1">required</span>}
+                    {p.required && <span className="text-red-400 ml-1">{t("required")}</span>}
                   </div>
                 ))}
               </div>
@@ -188,7 +183,7 @@ export function ContractDesigner() {
                 <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                   className={`rounded-lg border p-4 ${testResult.status === 200 ? "border-accent-emerald/20 bg-accent-emerald/5" : "border-red-500/20 bg-red-500/5"}`}>
                   <div className={`text-xs font-mono font-bold mb-2 ${testResult.status === 200 ? "text-accent-emerald" : "text-red-400"}`}>
-                    Status: {testResult.status}
+                    {t("status")}: {testResult.status}
                   </div>
                   <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap break-words max-h-[250px] overflow-auto">
                     {(() => { try { return JSON.stringify(JSON.parse(testResult.body), null, 2); } catch { return testResult.body; } })()}
@@ -197,7 +192,7 @@ export function ContractDesigner() {
               )}
               {!testResult && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[200px] flex items-center justify-center text-xs text-muted">
-                  Design your API and click test to see the result
+                  {t("designPrompt")}
                 </motion.div>
               )}
             </AnimatePresence>
