@@ -110,4 +110,4 @@ jobs:
       - name: Check frontend and backend route
         run: |
           curl --fail --silent --show-error --retry 5 --retry-all-errors https://learning-apis.gonor.me/en > /dev/null
-          curl --fail --silent --show-error --retry 5 --retry-all-errors https://learning-apis.gonor.me/api/mortality > /dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors "https://learning-apis.gonor.me/api/mortality?age=45" > /dev/null
