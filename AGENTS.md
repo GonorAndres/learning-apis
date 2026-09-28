@@ -122,3 +122,29 @@ npm run test:watch   # Watch mode
 - `useApiCall.test.ts` - Hook lifecycle (idle/loading/success/error/reset)
 
 Run `npm test` before pushing.
+
+## Active Work
+
+The active implementation plan is
+`docs/plans/beginner-api-storytelling-redesign.md`, and the current session
+handoff is `HANDOFF.md`. Read both before changing the landing page,
+illustrations, navigation, or translations. Follow the plan in phase order
+unless new user direction requires updating the plan first.
+
+### Active Plan Constraints
+
+- Preserve the existing formal API curriculum. Reorder and progressively reveal
+  material rather than removing its existing depth.
+- Design first for non-developers in marketing, HR, accounting, finance, and
+  similar teams who do not yet think in terms of software systems or data
+  abstractions.
+- Explain why APIs are useful and when they fit before teaching requests, JSON,
+  authentication, code, or API construction.
+- Help visitors collaborate with development teams; do not make becoming an API
+  specialist the primary outcome.
+- Keep English and Spanish translation keys and meaning synchronized.
+- Use Nano Banana Pro for the final primary hook illustration, Flash for the
+  main supporting explanation, and Lite for small use-case illustrations.
+- Generated images must contain no text, logos, fake product interfaces, or
+  essential information unavailable in HTML.
+- Ask before committing, pushing, or performing other Git actions.
